@@ -49,7 +49,6 @@
         <TextBox Margin="14,286,73,0" TextWrapping="Wrap" Text="post" VerticalAlignment="Top" Name="searchBox" Grid.Column="1"/>
         <Button Content="Поиск" Margin="14,320,73,0" VerticalAlignment="Top" Height="40" Click="SearchService" Grid.Column="1"/>
         <Button Content="Применить тип запуска"  Margin="12,5,23,0"  Height="86" VerticalAlignment="Top" Click="ApplyServiceTypeStartup" Grid.Column="6" Grid.Row="2"  />
-        <CheckBox Content="Только для остановки postgreSql " Name="disableServ" Margin="12,133,15,0" VerticalAlignment="Top" Height="22" Grid.Column="5" />
         <ComboBox Margin="88,9,23,8" Name="typeStart" Grid.Column="6" Grid.Row="1"/>
         <TextBlock Margin="10,8,150,6" TextWrapping="Wrap" Text="Тип запуска" Grid.Column="6" Grid.Row="1"/>
         <Button Margin="66,230,45,0" VerticalAlignment="Top" Click="ServiceAnotherUser" Grid.Column="6">

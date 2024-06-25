@@ -15,6 +15,7 @@ using System.Text.RegularExpressions;
 using System.Management;
 
 using static closeServ.MainWindow;
+using Microsoft.Win32;
 
 namespace closeServ
 {
@@ -70,21 +71,76 @@ namespace closeServ
         // Завершение службы
         private void TerminatService(object sender, RoutedEventArgs e)
         {
+            // Перебор всех служб
             foreach (ServiceInfo selectedItem in SelectedService.SelectedItems)
             {
-                TypeStartServ(selectedItem);
-                if (disableServ.IsChecked == true)
+                ServiceInfo clonedItem = new ServiceInfo { ServiceName = selectedItem.ServiceName, DisplayName = selectedItem.DisplayName };
+                // Проверяем, является ли служба PostgreSQL
+                if (clonedItem.ServiceName.ToLower().Contains("postgresql"))
                 {
-                    Process.Start("cmd", $"/с pg_ctl -D \"%PROGRAMFILES%\\PostgreSQL\\14\\data\" stop").WaitForExit(); // требует проверки
-                    break;
+                    // Поиск ключа реестра, содержащего "postgresql"
+                    string baseRegistryKey = @"SOFTWARE\PostgreSQL\Installations";
+                    string registryKeyPath = null;
+                    using (RegistryKey baseKey = Registry.LocalMachine.OpenSubKey(baseRegistryKey))
+                    {
+                        if (baseKey != null)
+                        {
+                            registryKeyPath = baseKey.GetSubKeyNames()
+                                .FirstOrDefault(subKeyName => subKeyName.ToLower().Contains("postgresql"));
+
+                            if (registryKeyPath != null)
+                            {
+                                registryKeyPath = $@"{baseRegistryKey}\{registryKeyPath}";
+                            }
+                        }
+                    }
+
+                    // Если ключ найден, получаем путь к директории данных и останавливаем PostgreSQL
+                    if (registryKeyPath != null)
+                    {
+                        string dataDirectory = "";
+                        using (RegistryKey key = Registry.LocalMachine.OpenSubKey(registryKeyPath))
+                        {
+                            if (key != null)
+                            {
+                                Object o = key.GetValue("Data Directory");
+                                if (o != null)
+                                {
+                                    dataDirectory = o.ToString();
+                                }
+                            }
+                        }
+
+                        // Если путь найден, останавливаем PostgreSQL
+                        if (!string.IsNullOrEmpty(dataDirectory))
+                        {
+                            string command = $"pg_ctl -D \"{dataDirectory}\" stop";
+                            // Запуск команды с правами администратора
+                            ProcessStartInfo procStartInfo = new ProcessStartInfo("cmd", $"/c {command}")
+                            {
+                                UseShellExecute = true,
+                                Verb = "runas"
+                            };
+
+                            try
+                            {
+                                Process proc = Process.Start(procStartInfo);
+                                proc.WaitForExit();
+                            }
+                            catch (System.ComponentModel.Win32Exception)
+                            {
+                                MessageBox.Show("Операция была отменена пользователем или требуются права администратора.");
+                            }
+                        }
+                    }
                 }
+                // Все остальные службы
                 else
                 {
-                    ServiceInfo clonedItem = new ServiceInfo { ServiceName = selectedItem.ServiceName, DisplayName = selectedItem.DisplayName };
-                    //MessageBox.Show(clonedItem.ServiceName.ToString());
-                    Process.Start("cmd", $"/c sc stop {clonedItem.ServiceName.ToString()}").WaitForExit();
+                    Process.Start("cmd", $"/c sc stop {clonedItem.ServiceName}").WaitForExit();
                 }
             }
+
         }
 
         // Запуск службы
@@ -94,7 +150,23 @@ namespace closeServ
             {
                 TypeStartServ(selectedItem);
                 ServiceInfo clonedItem = new ServiceInfo { ServiceName = selectedItem.ServiceName, DisplayName = selectedItem.DisplayName };
-                Process.Start("cmd", $"/c sc start {clonedItem.ServiceName.ToString()}").WaitForExit();
+
+                ProcessStartInfo procStartInfo = new ProcessStartInfo("cmd", $"/c sc start {clonedItem.ServiceName.ToString()}")
+                {
+                    UseShellExecute = true,
+                    Verb = "runas" // Запуск от имени администратора
+                };
+
+                try
+                {
+                    Process proc = Process.Start(procStartInfo);
+                    proc.WaitForExit(); // Ожидаем завершения процесса
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                    // Обработка исключения, если пользователь не предоставил права администратора
+                    MessageBox.Show("Операция была отменена пользователем или требуются права администратора.");
+                }
 
             }
         }
